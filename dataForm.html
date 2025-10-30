@@ -1,30 +1,100 @@
+<?php
+// ---------------------
+// CONFIG - edit if needed
+// ---------------------
+define('DB_HOST', 'localhost');
+define('DB_PORT', 8889);       // MAMP default MySQL port is 8889
+define('DB_USER', 'root');     // MAMP default MySQL user
+define('DB_PASS', 'root');     // MAMP default MySQL password
+define('DB_NAME', 'dataform'); // database name we'll create below
+
+// ---------------------
+// Connect to MySQL
+// ---------------------
+$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
+if ($conn->connect_error) {
+    die('Connection Failed: ' . $conn->connect_error);
+}
+
+// ---------------------
+// Handle POST submission
+// ---------------------
+$msg = '';
+$fname = $lname = $email = $subj = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // simple trimming
+    $fname = trim($_POST['input1'] ?? '');
+    $lname = trim($_POST['input2'] ?? '');
+    $email = trim($_POST['input3'] ?? '');
+    $subj  = trim($_POST['input4'] ?? '');
+
+    // basic validation example (require at least name or email)
+    if ($fname === '' && $lname === '' && $email === '' && $subj === '') {
+        $msg = 'Please enter at least one value before submitting.';
+    } else {
+        // Prepared statement to insert safely
+        $stmt = $conn->prepare(
+            "INSERT INTO user_inquiries (FirstName, LastName, EmailAddress, Subject) VALUES (?, ?, ?, ?)"
+        );
+        if ($stmt === false) {
+            $msg = 'Prepare failed: ' . htmlspecialchars($conn->error);
+        } else {
+            $stmt->bind_param('ssss', $fname, $lname, $email, $subj);
+            if ($stmt->execute()) {
+                $msg = 'Thank you — your message has been received.';
+                // clear form variables to show empty form after successful submit
+                $fname = $lname = $email = $subj = '';
+            } else {
+                $msg = 'Insert error: ' . htmlspecialchars($stmt->error);
+            }
+            $stmt->close();
+        }
+    }
+}
+
+$conn->close();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Data Form</title>
- 
+  <style>
+    body { font-family: Arial, sans-serif; padding: 30px; }
+    .container { max-width: 520px; margin: 0 auto; }
+    input, textarea { display:block; width:100%; box-sizing:border-box; margin-bottom:12px; padding:8px; border-radius:4px; }
+    button { padding:8px 14px; border-radius:6px; }
+    .msg { margin-bottom:12px; color:green; }
+    .error { color: red; }
+    h1 { text-align:center; }
+  </style>
 </head>
 <body>
   <div class="container">
     <h1>Contact Us</h1>
 
+    <?php if ($msg !== ''): ?>
+      <div class="<?= (strpos($msg, 'error') !== false ? 'error' : 'msg') ?>">
+        <?= htmlspecialchars($msg) ?>
+      </div>
+    <?php endif; ?>
+
     <form id="form1" method="POST" action="">
-      <h5>First Name</h5>
+      <label><strong>First Name</strong></label>
       <input type="text" name="input1" placeholder="First Name..." value="<?= htmlspecialchars($fname ?? '') ?>">
 
-      <h5>Last Name</h5>
+      <label><strong>Last Name</strong></label>
       <input type="text" name="input2" placeholder="Last Name..." value="<?= htmlspecialchars($lname ?? '') ?>">
 
-      <h5>Email Address</h5>
+      <label><strong>Email Address</strong></label>
       <input type="email" name="input3" placeholder="Email Address..." value="<?= htmlspecialchars($email ?? '') ?>">
 
-      <h5>Subject</h5>
-      <textarea name="input4" placeholder="Subject..." rows="5" cols="30"><?= htmlspecialchars($subj ?? '') ?></textarea>
+      <label><strong>Subject</strong></label>
+      <textarea name="input4" placeholder="Subject..." rows="5"><?= htmlspecialchars($subj ?? '') ?></textarea>
 
-      <br>
-      <button name="button1" type="submit" style="width:100px; height:28px; margin-top:8px;">Submit</button>
+      <button type="submit" style="margin-top:6px;">Submit</button>
     </form>
   </div>
 </body>
